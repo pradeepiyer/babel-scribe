@@ -8,7 +8,3 @@ class TranscriptionError(ScribeError):
 
 class TranslationError(ScribeError):
     pass
-
-
-class DriveError(ScribeError):
-    pass

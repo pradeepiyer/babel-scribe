@@ -64,15 +64,6 @@ babel-scribe transcribe file1.mp3 file2.mp3 --to en
 babel-scribe transcribe recording.mp3 --to en -o json
 ```
 
-### From Google Drive
-
-```bash
-babel-scribe auth  # one-time setup
-babel-scribe transcribe "https://drive.google.com/file/d/FILE_ID/view" --to en
-```
-
-Drive folders work too — all audio files in the folder will be processed.
-
 ## Supported Providers
 
 | Provider | Transcription | Translation | Model prefix |

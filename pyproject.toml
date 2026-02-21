@@ -11,8 +11,6 @@ dependencies = [
     "click>=8.0",
     "openai>=1.0",
     "sarvamai>=0.1.15",
-    "google-api-python-client>=2.0",
-    "google-auth-oauthlib>=1.0",
     "rich>=13.0",
     "tenacity>=8.0",
 ]

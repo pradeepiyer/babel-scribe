@@ -154,16 +154,6 @@ def test_transcribe_multiple_local_files(tmp_path: Path) -> None:
         assert (tmp_path / f"test{i}.txt").exists()
 
 
-def test_auth_command() -> None:
-    with patch("babel_scribe.cli.authenticate", new_callable=AsyncMock) as mock_auth:
-        runner = CliRunner()
-        result = runner.invoke(main, ["auth"])
-
-    assert result.exit_code == 0
-    assert "successful" in result.output
-    mock_auth.assert_called_once()
-
-
 def test_transcribe_no_translation_when_same_language(tmp_path: Path) -> None:
     audio = tmp_path / "test.mp3"
     audio.write_bytes(b"fake audio")
