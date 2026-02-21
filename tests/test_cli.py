@@ -28,7 +28,9 @@ def test_transcribe_local_file_text_output(tmp_path: Path) -> None:
 
     scribe_result = ScribeResult(
         transcription=TranscriptionResult(text="hola mundo", source_language="es"),
-        translation=TranslationResult(text="hello world", source_language="es", target_language="en"),
+        translation=TranslationResult(
+            text="hello world", source_language="es", target_language="en"
+        ),
     )
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):

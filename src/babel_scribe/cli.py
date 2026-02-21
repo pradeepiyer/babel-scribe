@@ -5,11 +5,10 @@ from pathlib import Path
 
 import click
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, MofNCompleteColumn
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
 from babel_scribe.config import load_config
 from babel_scribe.drive import (
-    DriveError,
     authenticate,
     download_file,
     list_audio_files,
@@ -30,17 +29,16 @@ def _is_drive_url(source: str) -> bool:
 
 
 def _format_text_output(result: ScribeResult, timestamps: bool) -> str:
-    if result.translation:
-        text = result.translation.text
-    else:
-        text = result.transcription.text
+    text = result.translation.text if result.translation else result.transcription.text
 
     if timestamps and result.transcription.segments:
         lines = []
         for seg in result.transcription.segments:
             start_min, start_sec = divmod(seg.start, 60)
             end_min, end_sec = divmod(seg.end, 60)
-            lines.append(f"[{int(start_min):02d}:{start_sec:05.2f} - {int(end_min):02d}:{end_sec:05.2f}] {seg.text}")
+            start = f"{int(start_min):02d}:{start_sec:05.2f}"
+            end = f"{int(end_min):02d}:{end_sec:05.2f}"
+            lines.append(f"[{start} - {end}] {seg.text}")
         return "\n".join(lines)
 
     return text
@@ -125,7 +123,7 @@ async def _process_local_files(
 
         results = [t.result() for t in tasks]
 
-    for path, result in zip(paths, results):
+    for path, result in zip(paths, results, strict=True):
         output = (
             _format_json_output(result)
             if output_format == "json"
@@ -208,7 +206,7 @@ async def _process_drive_source(
                 concurrency,
             )
 
-            for (af, local_file), result in zip(local_files, results):
+            for (af, local_file), result in zip(local_files, results, strict=True):
                 output = (
                     _format_json_output(result)
                     if output_format == "json"
@@ -241,7 +239,7 @@ def auth() -> None:
         console.print("[green]Authentication successful![/green]")
     except ScribeError as e:
         console.print(f"[red]Error:[/red] {e}")
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
 
 @main.command()
@@ -288,7 +286,7 @@ def transcribe(
         )
     except ScribeError as e:
         console.print(f"[red]Error:[/red] {e}")
-        raise SystemExit(1)
+        raise SystemExit(1) from None
 
 
 async def _run_transcribe(

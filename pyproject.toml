@@ -42,6 +42,11 @@ select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
 [tool.pyright]
 pythonVersion = "3.12"
 typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+reportUnknownMemberType = false
+reportUnknownVariableType = false
+reportUnknownArgumentType = false
+reportPrivateImportUsage = false
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

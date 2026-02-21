@@ -2,7 +2,7 @@ import asyncio
 from pathlib import Path
 
 from babel_scribe.pipeline import scribe, scribe_batch
-from babel_scribe.types import Segment
+from babel_scribe.types import Segment, TranscriptionResult
 
 from .conftest import FakeTranscriber, FakeTranslator
 
@@ -116,8 +116,6 @@ async def test_scribe_batch_respects_concurrency(tmp_path: Path) -> None:
             await asyncio.sleep(0.01)
             async with lock:
                 current_concurrent -= 1
-            from babel_scribe.types import TranscriptionResult
-
             return TranscriptionResult(text="text", source_language="es")
 
     transcriber = TrackingTranscriber()

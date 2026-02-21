@@ -155,7 +155,9 @@ async def list_audio_files(folder_id: str) -> list[DriveFile]:
             )
 
             for item in response.get("files", []):
-                files.append(DriveFile(id=item["id"], name=item["name"], mime_type=item["mimeType"]))
+                files.append(
+                    DriveFile(id=item["id"], name=item["name"], mime_type=item["mimeType"])
+                )
 
             page_token = response.get("nextPageToken")
             if not page_token:
