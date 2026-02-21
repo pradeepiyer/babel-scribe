@@ -7,6 +7,7 @@ CONFIG_FILE = CONFIG_DIR / "config.toml"
 
 DEFAULT_TARGET_LANGUAGE = "en"
 DEFAULT_CONCURRENCY = 5
+DEFAULT_JOB_TIMEOUT = 1800
 DEFAULT_TRANSCRIPTION_MODEL = "groq/whisper-large-v3-turbo"
 DEFAULT_TRANSLATION_MODEL = "groq/llama-3.3-70b-versatile"
 
@@ -15,6 +16,7 @@ DEFAULT_TRANSLATION_MODEL = "groq/llama-3.3-70b-versatile"
 class Config:
     target_language: str = DEFAULT_TARGET_LANGUAGE
     concurrency: int = DEFAULT_CONCURRENCY
+    job_timeout: int = DEFAULT_JOB_TIMEOUT
     transcription_model: str = DEFAULT_TRANSCRIPTION_MODEL
     translation_model: str = DEFAULT_TRANSLATION_MODEL
 
@@ -33,6 +35,7 @@ def load_config(path: Path = CONFIG_FILE) -> Config:
     return Config(
         target_language=defaults.get("target_language", DEFAULT_TARGET_LANGUAGE),
         concurrency=defaults.get("concurrency", DEFAULT_CONCURRENCY),
+        job_timeout=defaults.get("job_timeout", DEFAULT_JOB_TIMEOUT),
         transcription_model=models.get("transcription", DEFAULT_TRANSCRIPTION_MODEL),
         translation_model=models.get("translation", DEFAULT_TRANSLATION_MODEL),
     )

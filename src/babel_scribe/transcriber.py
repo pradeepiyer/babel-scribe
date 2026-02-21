@@ -89,10 +89,13 @@ class SarvamTranscriber:
     in a single API call (no separate translation step needed).
     """
 
-    def __init__(self, model: str, api_key: str, target_language: str = "en") -> None:
+    def __init__(
+        self, model: str, api_key: str, target_language: str = "en", job_timeout: int = 1800
+    ) -> None:
         self.model = model
         self.api_key = api_key
         self.target_language = target_language
+        self.job_timeout = job_timeout
 
     async def transcribe(
         self,
@@ -131,7 +134,7 @@ class SarvamTranscriber:
         )
         job.upload_files([str(audio_path)])
         job.start()
-        job.wait_until_complete(timeout=600)
+        job.wait_until_complete(timeout=self.job_timeout)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             job.download_outputs(tmp_dir)
@@ -165,11 +168,14 @@ class SarvamTranscriber:
         return TranscriptionResult(text=text, source_language=source_language, segments=segments)
 
 
-def create_transcriber(model: str, target_language: str = "en") -> Transcriber:
+def create_transcriber(
+    model: str, target_language: str = "en", job_timeout: int = 1800
+) -> Transcriber:
     provider, model_name = parse_model(model)
     api_key = os.environ.get(provider.api_key_env, "")
     if model.startswith("sarvam/"):
         return SarvamTranscriber(
-            model=model_name, api_key=api_key, target_language=target_language
+            model=model_name, api_key=api_key, target_language=target_language,
+            job_timeout=job_timeout,
         )
     return WhisperTranscriber(model=model_name, base_url=provider.base_url, api_key=api_key)

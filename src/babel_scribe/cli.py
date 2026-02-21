@@ -179,7 +179,7 @@ def transcribe(
     t_model = transcription_model or config.transcription_model
     l_model = translation_model or config.translation_model
 
-    transcriber = create_transcriber(t_model, target_language)
+    transcriber = create_transcriber(t_model, target_language, config.job_timeout)
     translator = create_translator(l_model)
 
     try:

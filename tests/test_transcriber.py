@@ -66,6 +66,16 @@ def test_create_transcriber_sarvam(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SARVAM_API_KEY", "test-key")
     t = create_transcriber("sarvam/saaras:v3")
     assert isinstance(t, SarvamTranscriber)
+    assert t.job_timeout == 1800
+
+
+def test_create_transcriber_sarvam_custom_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    from babel_scribe.transcriber import SarvamTranscriber
+
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+    t = create_transcriber("sarvam/saaras:v3", job_timeout=3600)
+    assert isinstance(t, SarvamTranscriber)
+    assert t.job_timeout == 3600
 
 
 def test_create_transcriber_unknown_provider() -> None:
