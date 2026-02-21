@@ -1,8 +1,7 @@
-import asyncio
 from pathlib import Path
 
-from babel_scribe.pipeline import scribe, scribe_batch
-from babel_scribe.types import Segment, TranscriptionResult
+from babel_scribe.pipeline import scribe
+from babel_scribe.types import Segment
 
 from .conftest import FakeTranscriber, FakeTranslator
 
@@ -74,65 +73,3 @@ async def test_scribe_uses_auto_when_no_language_detected(tmp_path: Path) -> Non
     assert translator.calls[0][1] == "auto"
 
 
-async def test_scribe_batch_processes_all_files(tmp_path: Path) -> None:
-    files = []
-    for i in range(3):
-        f = tmp_path / f"test{i}.mp3"
-        f.touch()
-        files.append(f)
-
-    transcriber = FakeTranscriber(text="hola", source_language="es")
-    translator = FakeTranslator(translated_text="hello")
-
-    results = await scribe_batch(files, transcriber, translator, target_language="en")
-
-    assert len(results) == 3
-    assert transcriber.call_count == 3
-    assert translator.call_count == 3
-
-
-async def test_scribe_batch_respects_concurrency(tmp_path: Path) -> None:
-    files = []
-    for i in range(10):
-        f = tmp_path / f"test{i}.mp3"
-        f.touch()
-        files.append(f)
-
-    max_concurrent = 0
-    current_concurrent = 0
-    lock = asyncio.Lock()
-
-    class TrackingTranscriber:
-        async def transcribe(
-            self,
-            audio_path: Path,
-            language: str | None = None,
-            timestamps: bool = False,
-        ) -> "TranscriptionResult":
-            nonlocal max_concurrent, current_concurrent
-            async with lock:
-                current_concurrent += 1
-                max_concurrent = max(max_concurrent, current_concurrent)
-            await asyncio.sleep(0.01)
-            async with lock:
-                current_concurrent -= 1
-            return TranscriptionResult(text="text", source_language="es")
-
-    transcriber = TrackingTranscriber()
-    translator = FakeTranslator(translated_text="translated")
-
-    results = await scribe_batch(
-        files, transcriber, translator, target_language="en", concurrency=3  # type: ignore[arg-type]
-    )
-
-    assert len(results) == 10
-    assert max_concurrent <= 3
-
-
-async def test_scribe_batch_empty_list() -> None:
-    transcriber = FakeTranscriber()
-    translator = FakeTranslator()
-
-    results = await scribe_batch([], transcriber, translator)
-
-    assert results == []

@@ -6,10 +6,9 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import openai
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from babel_scribe.errors import TranscriptionError
-from babel_scribe.providers import parse_model
+from babel_scribe.providers import PROVIDERS, api_retry, handle_api_errors, parse_model
 from babel_scribe.types import Segment, TranscriptionResult
 
 
@@ -28,14 +27,7 @@ class WhisperTranscriber:
         self.model = model
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=4),
-        retry=retry_if_exception_type(
-            (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError)
-        ),
-        reraise=True,
-    )
+    @api_retry
     async def transcribe(
         self,
         audio_path: Path,
@@ -51,12 +43,8 @@ class WhisperTranscriber:
         if timestamps:
             kwargs["response_format"] = "verbose_json"
 
-        try:
+        with handle_api_errors(TranscriptionError):
             response = await self._client.audio.transcriptions.create(**kwargs)
-        except (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError):
-            raise
-        except openai.OpenAIError as e:
-            raise TranscriptionError(str(e)) from e
 
         if timestamps:
             # verbose_json returns a Transcription object with extra fields
@@ -67,11 +55,9 @@ class WhisperTranscriber:
             if raw_segments is not None:
                 segments = [
                     Segment(
-                        text=seg.get("text", "") if isinstance(seg, dict) else seg.text,
-                        start=float(
-                            seg.get("start", 0.0) if isinstance(seg, dict) else seg.start
-                        ),
-                        end=float(seg.get("end", 0.0) if isinstance(seg, dict) else seg.end),
+                        text=seg.text,
+                        start=float(seg.start),
+                        end=float(seg.end),
                     )
                     for seg in raw_segments
                 ]
@@ -173,7 +159,7 @@ def create_transcriber(
 ) -> Transcriber:
     provider, model_name = parse_model(model)
     api_key = os.environ.get(provider.api_key_env, "")
-    if model.startswith("sarvam/"):
+    if provider is PROVIDERS["sarvam"]:
         return SarvamTranscriber(
             model=model_name, api_key=api_key, target_language=target_language,
             job_timeout=job_timeout,

@@ -1,4 +1,30 @@
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
+
+import openai
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from babel_scribe.errors import ScribeError
+
+TRANSIENT_ERRORS = (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError)
+
+api_retry = retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=1, max=4),
+    retry=retry_if_exception_type(TRANSIENT_ERRORS),
+    reraise=True,
+)
+
+
+@contextmanager
+def handle_api_errors(error_class: type[ScribeError]) -> Iterator[None]:
+    try:
+        yield
+    except TRANSIENT_ERRORS:
+        raise
+    except openai.OpenAIError as e:
+        raise error_class(str(e)) from e
 
 
 @dataclass(frozen=True)

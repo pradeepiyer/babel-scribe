@@ -2,10 +2,9 @@ import os
 from typing import Protocol, runtime_checkable
 
 import openai
-from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from babel_scribe.errors import TranslationError
-from babel_scribe.providers import parse_model
+from babel_scribe.providers import api_retry, handle_api_errors, parse_model
 
 
 @runtime_checkable
@@ -20,14 +19,7 @@ class ChatTranslator:
         self.model = model
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=4),
-        retry=retry_if_exception_type(
-            (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError)
-        ),
-        reraise=True,
-    )
+    @api_retry
     async def translate(
         self, text: str, source_language: str, target_language: str
     ) -> str:
@@ -43,14 +35,10 @@ class ChatTranslator:
             {"role": "user", "content": text},
         ]
 
-        try:
+        with handle_api_errors(TranslationError):
             response = await self._client.chat.completions.create(
                 model=self.model, messages=messages  # type: ignore[arg-type]
             )
-        except (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError):
-            raise
-        except openai.OpenAIError as e:
-            raise TranslationError(str(e)) from e
 
         return response.choices[0].message.content or ""
 
