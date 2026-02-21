@@ -17,8 +17,8 @@ from babel_scribe.drive import (
 )
 from babel_scribe.errors import ScribeError
 from babel_scribe.pipeline import scribe, scribe_batch
-from babel_scribe.transcriber import LitellmTranscriber
-from babel_scribe.translator import LitellmTranslator
+from babel_scribe.transcriber import Transcriber, create_transcriber
+from babel_scribe.translator import Translator, create_translator
 from babel_scribe.types import ScribeResult
 
 console = Console()
@@ -38,7 +38,8 @@ def _format_text_output(result: ScribeResult, timestamps: bool) -> str:
             end_min, end_sec = divmod(seg.end, 60)
             start = f"{int(start_min):02d}:{start_sec:05.2f}"
             end = f"{int(end_min):02d}:{end_sec:05.2f}"
-            lines.append(f"[{start} - {end}] {seg.text}")
+            prefix = f"[Speaker {seg.speaker}] " if seg.speaker else ""
+            lines.append(f"{prefix}[{start} - {end}] {seg.text}")
         return "\n".join(lines)
 
     return text
@@ -53,10 +54,13 @@ def _format_json_output(result: ScribeResult) -> str:
     }
 
     if result.transcription.segments:
-        data["segments"] = [
-            {"text": s.text, "start": s.start, "end": s.end}
-            for s in result.transcription.segments
-        ]
+        segments_data = []
+        for s in result.transcription.segments:
+            seg: dict[str, object] = {"text": s.text, "start": s.start, "end": s.end}
+            if s.speaker is not None:
+                seg["speaker"] = s.speaker
+            segments_data.append(seg)
+        data["segments"] = segments_data
 
     if result.translation:
         data["translation"] = {
@@ -75,8 +79,8 @@ def _output_path_for(audio_path: Path, output_folder: Path | None) -> Path:
 
 async def _process_local_files(
     paths: list[Path],
-    transcriber: LitellmTranscriber,
-    translator: LitellmTranslator,
+    transcriber: Transcriber,
+    translator: Translator,
     source_language: str | None,
     target_language: str,
     timestamps: bool,
@@ -136,8 +140,8 @@ async def _process_local_files(
 
 async def _process_drive_source(
     source: str,
-    transcriber: LitellmTranscriber,
-    translator: LitellmTranslator,
+    transcriber: Transcriber,
+    translator: Translator,
     source_language: str | None,
     target_language: str,
     timestamps: bool,
@@ -274,8 +278,8 @@ def transcribe(
     t_model = transcription_model or config.transcription_model
     l_model = translation_model or config.translation_model
 
-    transcriber = LitellmTranscriber(model=t_model)
-    translator = LitellmTranslator(model=l_model)
+    transcriber = create_transcriber(t_model, target_language)
+    translator = create_translator(l_model)
 
     try:
         asyncio.run(
@@ -291,8 +295,8 @@ def transcribe(
 
 async def _run_transcribe(
     sources: tuple[str, ...],
-    transcriber: LitellmTranscriber,
-    translator: LitellmTranslator,
+    transcriber: Transcriber,
+    translator: Translator,
     source_language: str | None,
     target_language: str,
     timestamps: bool,

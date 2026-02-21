@@ -6,6 +6,7 @@ class Segment:
     text: str
     start: float
     end: float
+    speaker: str | None = None
 
 
 @dataclass(frozen=True)
