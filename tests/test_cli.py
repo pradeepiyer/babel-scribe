@@ -28,9 +28,7 @@ def test_transcribe_local_file_text_output(tmp_path: Path) -> None:
 
     scribe_result = ScribeResult(
         transcription=TranscriptionResult(text="hola mundo", source_language="es"),
-        translation=TranslationResult(
-            text="hello world", source_language="es", target_language="en"
-        ),
+        translation=TranslationResult(text="hello world", source_language="es", target_language="en"),
     )
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
@@ -72,9 +70,7 @@ def test_transcribe_with_timestamps_text(tmp_path: Path) -> None:
         Segment(text="world", start=1.5, end=3.0),
     ]
     scribe_result = ScribeResult(
-        transcription=TranscriptionResult(
-            text="hello world", source_language="en", segments=segments
-        ),
+        transcription=TranscriptionResult(text="hello world", source_language="en", segments=segments),
     )
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
@@ -96,9 +92,7 @@ def test_transcribe_with_timestamps_json(tmp_path: Path) -> None:
         Segment(text="hello", start=0.0, end=1.5),
     ]
     scribe_result = ScribeResult(
-        transcription=TranscriptionResult(
-            text="hello", source_language="en", segments=segments
-        ),
+        transcription=TranscriptionResult(text="hello", source_language="en", segments=segments),
     )
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
@@ -124,9 +118,7 @@ def test_transcribe_output_folder(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(
-            main, ["transcribe", str(audio), "--output-folder", str(out_dir), "--to", "en"]
-        )
+        result = runner.invoke(main, ["transcribe", str(audio), "--output-folder", str(out_dir), "--to", "en"])
 
     assert result.exit_code == 0
     out_file = out_dir / "test.txt"

@@ -1,6 +1,15 @@
+import os
 from pathlib import Path
 
+import pytest
+
 from babel_scribe.types import Segment, TranscriptionResult
+
+
+@pytest.fixture
+def require_api_key() -> None:
+    if not os.environ.get("GROQ_API_KEY"):
+        pytest.skip("GROQ_API_KEY not set")
 
 
 class FakeTranscriber:

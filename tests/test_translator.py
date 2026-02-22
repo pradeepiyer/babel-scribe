@@ -17,12 +17,6 @@ def translator() -> ChatTranslator:
     )
 
 
-@pytest.fixture
-def require_api_key() -> None:
-    if not os.environ.get("GROQ_API_KEY"):
-        pytest.skip("GROQ_API_KEY not set")
-
-
 @pytest.mark.usefixtures("require_api_key")
 async def test_translate_spanish_to_english(translator: ChatTranslator) -> None:
     result = await translator.translate("Hola, mundo", "es", "en")

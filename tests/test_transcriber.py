@@ -12,16 +12,10 @@ pytestmark = pytest.mark.integration
 def transcriber() -> WhisperTranscriber:
     api_key = os.environ.get("GROQ_API_KEY", "")
     return WhisperTranscriber(
-        model="whisper-large-v3-turbo",
+        model="whisper-large-v3",
         base_url="https://api.groq.com/openai/v1",
         api_key=api_key,
     )
-
-
-@pytest.fixture
-def require_api_key() -> None:
-    if not os.environ.get("GROQ_API_KEY"):
-        pytest.skip("GROQ_API_KEY not set")
 
 
 @pytest.mark.usefixtures("require_api_key")
@@ -37,9 +31,7 @@ async def test_transcribe_local_file(transcriber: WhisperTranscriber, tmp_path: 
 
 
 @pytest.mark.usefixtures("require_api_key")
-async def test_transcribe_with_timestamps(
-    transcriber: WhisperTranscriber, tmp_path: Path
-) -> None:
+async def test_transcribe_with_timestamps(transcriber: WhisperTranscriber, tmp_path: Path) -> None:
     audio_files = list(Path(".").glob("*.mp3")) + list(Path(".").glob("*.wav"))
     if not audio_files:
         pytest.skip("No audio file available for testing")
@@ -76,6 +68,13 @@ def test_create_transcriber_sarvam_custom_timeout(monkeypatch: pytest.MonkeyPatc
     t = create_transcriber("sarvam/saaras:v3", job_timeout=3600)
     assert isinstance(t, SarvamTranscriber)
     assert t.job_timeout == 3600
+
+
+def test_create_transcriber_passes_target_language(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "test-key")
+    t = create_transcriber("groq/whisper-large-v3", target_language="fr")
+    assert isinstance(t, WhisperTranscriber)
+    assert t.target_language == "fr"
 
 
 def test_create_transcriber_unknown_provider() -> None:

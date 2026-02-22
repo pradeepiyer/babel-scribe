@@ -13,9 +13,7 @@ async def scribe(
     target_language: str = "en",
     timestamps: bool = False,
 ) -> ScribeResult:
-    transcription = await transcriber.transcribe(
-        audio_path, language=source_language, timestamps=timestamps
-    )
+    transcription = await transcriber.transcribe(audio_path, language=source_language, timestamps=timestamps)
 
     detected_language = transcription.source_language or source_language
     if detected_language and detected_language.lower() == target_language.lower():

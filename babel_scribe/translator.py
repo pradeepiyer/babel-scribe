@@ -8,9 +8,7 @@ from babel_scribe.types import ScribeError
 
 
 class Translator(Protocol):
-    async def translate(
-        self, text: str, source_language: str, target_language: str
-    ) -> str: ...
+    async def translate(self, text: str, source_language: str, target_language: str) -> str: ...
 
 
 class ChatTranslator:
@@ -19,24 +17,20 @@ class ChatTranslator:
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     @api_retry
-    async def translate(
-        self, text: str, source_language: str, target_language: str
-    ) -> str:
+    async def translate(self, text: str, source_language: str, target_language: str) -> str:
+        system_content = (
+            f"You are a translator. Translate the following text from {source_language} to {target_language}."
+            " Output only the translated text, nothing else."
+        )
         messages: list[dict[str, str]] = [
-            {
-                "role": "system",
-                "content": (
-                    f"You are a translator. Translate the following text from "
-                    f"{source_language} to {target_language}. "
-                    f"Output only the translated text, nothing else."
-                ),
-            },
+            {"role": "system", "content": system_content},
             {"role": "user", "content": text},
         ]
 
         try:
             response = await self._client.chat.completions.create(
-                model=self.model, messages=messages  # type: ignore[arg-type]
+                model=self.model,
+                messages=messages,  # type: ignore[arg-type]
             )
         except TRANSIENT_ERRORS:
             raise

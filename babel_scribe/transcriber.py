@@ -21,8 +21,9 @@ class Transcriber(Protocol):
 
 
 class WhisperTranscriber:
-    def __init__(self, model: str, base_url: str, api_key: str) -> None:
+    def __init__(self, model: str, base_url: str, api_key: str, target_language: str = "en") -> None:
         self.model = model
+        self.target_language = target_language
         self._client = openai.AsyncOpenAI(base_url=base_url, api_key=api_key)
 
     @api_retry
@@ -36,13 +37,19 @@ class WhisperTranscriber:
             "model": self.model,
             "file": audio_path,
         }
-        if language is not None:
-            kwargs["language"] = language
         if timestamps:
             kwargs["response_format"] = "verbose_json"
 
+        translate_directly = self.target_language.lower() == "en"
+
+        if not translate_directly and language is not None:
+            kwargs["language"] = language
+
         try:
-            response = await self._client.audio.transcriptions.create(**kwargs)
+            if translate_directly:
+                response = await self._client.audio.translations.create(**kwargs)
+            else:
+                response = await self._client.audio.transcriptions.create(**kwargs)
         except TRANSIENT_ERRORS:
             raise
         except openai.OpenAIError as e:
@@ -51,35 +58,23 @@ class WhisperTranscriber:
         if timestamps:
             # verbose_json returns a Transcription object with extra fields
             text: str = response.text
-            source_language: str | None = getattr(response, "language", None)
+            source_language: str | None = "en" if translate_directly else getattr(response, "language", None)
             raw_segments = getattr(response, "segments", None)
             segments: list[Segment] | None = None
             if raw_segments is not None:
-                segments = [
-                    Segment(
-                        text=seg.text,
-                        start=float(seg.start),
-                        end=float(seg.end),
-                    )
-                    for seg in raw_segments
-                ]
-            return TranscriptionResult(
-                text=text, source_language=source_language, segments=segments
-            )
+                segments = [Segment(text=seg.text, start=float(seg.start), end=float(seg.end)) for seg in raw_segments]
+            return TranscriptionResult(text=text, source_language=source_language, segments=segments)
 
-        return TranscriptionResult(text=response.text)
+        return TranscriptionResult(
+            text=response.text,
+            source_language="en" if translate_directly else None,
+        )
 
 
 class SarvamTranscriber:
-    """Transcriber using Sarvam AI's batch speech-to-text API.
+    """Sarvam AI batch speech-to-text; uses translate mode for English targets."""
 
-    When target_language is "en", uses mode="translate" to get English output
-    in a single API call (no separate translation step needed).
-    """
-
-    def __init__(
-        self, model: str, api_key: str, target_language: str = "en", job_timeout: int = 1800
-    ) -> None:
+    def __init__(self, model: str, api_key: str, target_language: str = "en", job_timeout: int = 1800) -> None:
         self.model = model
         self.api_key = api_key
         self.target_language = target_language
@@ -95,9 +90,7 @@ class SarvamTranscriber:
         lang_code = f"{language}-IN" if language else "unknown"
 
         try:
-            return await asyncio.to_thread(
-                self._run_batch_job, audio_path, mode, lang_code, timestamps
-            )
+            return await asyncio.to_thread(self._run_batch_job, audio_path, mode, lang_code, timestamps)
         except ScribeError:
             raise
         except Exception as e:
@@ -156,14 +149,19 @@ class SarvamTranscriber:
         return TranscriptionResult(text=text, source_language=source_language, segments=segments)
 
 
-def create_transcriber(
-    model: str, target_language: str = "en", job_timeout: int = 1800
-) -> Transcriber:
+def create_transcriber(model: str, target_language: str = "en", job_timeout: int = 1800) -> Transcriber:
     base_url, api_key_env, model_name = parse_model(model)
     api_key = os.environ.get(api_key_env, "")
     if not base_url:
         return SarvamTranscriber(
-            model=model_name, api_key=api_key, target_language=target_language,
+            model=model_name,
+            api_key=api_key,
+            target_language=target_language,
             job_timeout=job_timeout,
         )
-    return WhisperTranscriber(model=model_name, base_url=base_url, api_key=api_key)
+    return WhisperTranscriber(
+        model=model_name,
+        base_url=base_url,
+        api_key=api_key,
+        target_language=target_language,
+    )

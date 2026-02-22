@@ -53,9 +53,7 @@ async def test_scribe_passes_language_and_timestamps(tmp_path: Path) -> None:
     transcriber = FakeTranscriber(text="hello", source_language="en", segments=segments)
     translator = FakeTranslator()
 
-    result = await scribe(
-        audio, transcriber, translator, source_language="en", target_language="en", timestamps=True
-    )
+    result = await scribe(audio, transcriber, translator, source_language="en", target_language="en", timestamps=True)
 
     assert transcriber.calls[0] == (audio, "en", True)
     assert result.transcription.segments == segments
@@ -71,5 +69,3 @@ async def test_scribe_uses_auto_when_no_language_detected(tmp_path: Path) -> Non
 
     assert result.translation is not None
     assert translator.calls[0][1] == "auto"
-
-

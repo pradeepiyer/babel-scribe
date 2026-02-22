@@ -84,14 +84,8 @@ async def _process_local_files(
 
     if len(paths) == 1:
         console.print(f"Transcribing [bold]{paths[0].name}[/bold]...")
-        result = await scribe(
-            paths[0], transcriber, translator, source_language, target_language, timestamps
-        )
-        output = (
-            _format_json_output(result)
-            if output_format == "json"
-            else _format_text_output(result, timestamps)
-        )
+        result = await scribe(paths[0], transcriber, translator, source_language, target_language, timestamps)
+        output = _format_json_output(result) if output_format == "json" else _format_text_output(result, timestamps)
         out_path = _output_path_for(paths[0], output_folder)
         out_path.write_text(output, encoding="utf-8")
         console.print(f"Output written to [bold]{out_path}[/bold]")
@@ -113,20 +107,14 @@ async def _process_local_files(
         async def process_one(path: Path) -> None:
             async with semaphore:
                 try:
-                    result = await scribe(
-                        path, transcriber, translator, source_language, target_language, timestamps
-                    )
+                    result = await scribe(path, transcriber, translator, source_language, target_language, timestamps)
                 except Exception as e:
                     failed.append((path, e))
-                    progress.console.print(
-                        f"  [red]FAILED[/red] [bold]{path.name}[/bold]: {e}"
-                    )
+                    progress.console.print(f"  [red]FAILED[/red] [bold]{path.name}[/bold]: {e}")
                     progress.advance(task)
                     return
                 output = (
-                    _format_json_output(result)
-                    if output_format == "json"
-                    else _format_text_output(result, timestamps)
+                    _format_json_output(result) if output_format == "json" else _format_text_output(result, timestamps)
                 )
                 out_path = _output_path_for(path, output_folder)
                 out_path.write_text(output, encoding="utf-8")
@@ -184,8 +172,15 @@ def transcribe(
     try:
         asyncio.run(
             _run_transcribe(
-                sources, transcriber, translator, from_lang, target_language,
-                timestamps, output_format, output_folder, effective_concurrency,
+                sources,
+                transcriber,
+                translator,
+                from_lang,
+                target_language,
+                timestamps,
+                output_format,
+                output_folder,
+                effective_concurrency,
             )
         )
     except ScribeError as e:
@@ -217,6 +212,13 @@ async def _run_transcribe(
         local_output_folder.mkdir(parents=True, exist_ok=True)
 
     await _process_local_files(
-        paths, transcriber, translator, source_language, target_language,
-        timestamps, output_format, local_output_folder, concurrency,
+        paths,
+        transcriber,
+        translator,
+        source_language,
+        target_language,
+        timestamps,
+        output_format,
+        local_output_folder,
+        concurrency,
     )
