@@ -63,13 +63,9 @@ babel-scribe transcribe recording.mp3 --from hi -o json
 
 The source language determines which transcription provider is used:
 
-- **Indian languages** → Sarvam AI (`saaras:v3`). When the target is English, Sarvam translates in a single step.
-- **All other languages** → OpenAI Whisper (`whisper-1`). When the target is English, the Whisper translations endpoint is used.
+- **Indian languages** → [Sarvam AI](https://docs.sarvam.ai/api-reference-docs/speech-to-text/saaras) (`saaras:v3`). When the target is English, Sarvam translates in a single step.
+- **All other languages** → [OpenAI Whisper](https://platform.openai.com/docs/guides/speech-to-text#supported-languages) (`whisper-1`). When the target is English, the Whisper translations endpoint is used.
 
 Translation (when target is not English) always uses OpenAI (`gpt-5-mini`).
-
-## Supported Indian Languages
-
-`as` (Assamese), `bn` (Bengali), `brx` (Bodo), `doi` (Dogri), `gu` (Gujarati), `hi` (Hindi), `kn` (Kannada), `kok` (Konkani), `ks` (Kashmiri), `mai` (Maithili), `ml` (Malayalam), `mni` (Manipuri), `mr` (Marathi), `ne` (Nepali), `or` (Odia), `pa` (Punjabi), `sa` (Sanskrit), `sat` (Santali), `sd` (Sindhi), `ta` (Tamil), `te` (Telugu), `ur` (Urdu)
 
 Region subtags are stripped for routing (e.g., `hi-IN` routes to Sarvam), but the full `--to` value is preserved in translation prompts (e.g., `pt-BR` specificity is kept).
