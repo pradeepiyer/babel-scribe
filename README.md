@@ -47,17 +47,7 @@ babel-scribe transcribe file1.mp3 file2.mp3 --from ta --to en
 babel-scribe transcribe recording.mp3 --from hi -o json
 ```
 
-## CLI Options
-
-| Option | Required | Default | Description |
-|--------|----------|---------|-------------|
-| `--from` | Yes | — | Source language code (ISO 639-1 or BCP-47) |
-| `--to` | No | `en` | Target language code (locale specificity preserved for translation) |
-| `--concurrency` | No | `5` | Max parallel tasks |
-| `--job-timeout` | No | `1800` | Sarvam batch job timeout in seconds |
-| `--timestamps` | No | off | Include segment timestamps |
-| `-o` | No | `text` | Output format (`text` or `json`) |
-| `--output-folder` | No | same as input | Output directory |
+For all options and examples, run `babel-scribe transcribe --help`.
 
 ## Provider Routing
 
@@ -68,4 +58,3 @@ The source language determines which transcription provider is used:
 
 Translation (when target is not English) always uses OpenAI (`gpt-5-mini`).
 
-Region subtags are stripped for routing (e.g., `hi-IN` routes to Sarvam), but the full `--to` value is preserved in translation prompts (e.g., `pt-BR` specificity is kept).
