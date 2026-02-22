@@ -132,17 +132,12 @@ async def _process_local_files(
         raise SystemExit(1)
 
 
-@click.group()
-def main() -> None:
-    """Audio transcription and translation tool."""
-
-
-@main.command(epilog="""\b
+@click.command(epilog="""\b
 Examples:
-  babel-scribe transcribe recording.mp3 --from hi
-  babel-scribe transcribe recording.mp3 --from es --to fr
-  babel-scribe transcribe recording.mp3 --from hi --timestamps
-  babel-scribe transcribe '*.mp3' --from ta -o json
+  babel-scribe recording.mp3 --from hi
+  babel-scribe recording.mp3 --from es --to fr
+  babel-scribe recording.mp3 --from hi --timestamps
+  babel-scribe '*.mp3' --from ta -o json
 """)
 @click.argument("sources", nargs=-1, required=True)
 @click.option("--from", "from_lang", required=True, help="Source language code (e.g. hi, es, en-US)")
@@ -155,7 +150,7 @@ Examples:
 @click.option("--concurrency", type=int, default=5, show_default=True, help="Max parallel file processing tasks")
 @click.option("--job-timeout", type=int, default=1800, show_default=True, help="Sarvam batch job timeout in seconds")
 @click.option("--timestamps", is_flag=True, help="Include word-level timestamps in output")
-def transcribe(
+def main(
     sources: tuple[str, ...],
     from_lang: str,
     to_lang: str,

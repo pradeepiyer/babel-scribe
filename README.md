@@ -20,34 +20,34 @@ uv pip install -e .
 ### Basic transcription (Hindi → English)
 
 ```bash
-babel-scribe transcribe recording.mp3 --from hi
+babel-scribe recording.mp3 --from hi
 ```
 
 ### Transcribe and translate (Spanish → French)
 
 ```bash
-babel-scribe transcribe recording.mp3 --from es --to fr
+babel-scribe recording.mp3 --from es --to fr
 ```
 
 ### With timestamps
 
 ```bash
-babel-scribe transcribe recording.mp3 --from hi --timestamps
+babel-scribe recording.mp3 --from hi --timestamps
 ```
 
 ### Multiple files
 
 ```bash
-babel-scribe transcribe file1.mp3 file2.mp3 --from ta --to en
+babel-scribe file1.mp3 file2.mp3 --from ta --to en
 ```
 
 ### JSON output
 
 ```bash
-babel-scribe transcribe recording.mp3 --from hi -o json
+babel-scribe recording.mp3 --from hi -o json
 ```
 
-For all options and examples, run `babel-scribe transcribe --help`.
+For all options and examples, run `babel-scribe --help`.
 
 ## Provider Routing
 
