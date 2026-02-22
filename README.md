@@ -44,7 +44,7 @@ babel-scribe file1.mp3 file2.mp3 --from ta --to en
 ### JSON output
 
 ```bash
-babel-scribe recording.mp3 --from hi -o json
+babel-scribe recording.mp3 --from hi --output-format json
 ```
 
 For all options and examples, run `babel-scribe --help`.

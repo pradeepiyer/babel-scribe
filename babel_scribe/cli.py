@@ -137,13 +137,13 @@ Examples:
   babel-scribe recording.mp3 --from hi
   babel-scribe recording.mp3 --from es --to fr
   babel-scribe recording.mp3 --from hi --timestamps
-  babel-scribe '*.mp3' --from ta -o json
+  babel-scribe '*.mp3' --from ta --output-format json
 """)
 @click.argument("sources", nargs=-1, required=True)
 @click.option("--from", "from_lang", required=True, help="Source language code (e.g. hi, es, en-US)")
 @click.option("--to", "to_lang", default="en", show_default=True, help="Target language code")
 @click.option(
-    "-o", "--output-format", type=click.Choice(["text", "json"]),
+    "--output-format", type=click.Choice(["text", "json"]),
     default="text", show_default=True, help="Output format",
 )
 @click.option("--output-folder", default=None, help="Write output files to this directory")

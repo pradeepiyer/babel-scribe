@@ -66,7 +66,7 @@ def test_transcribe_local_file_json_output(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["--from", "es", str(audio), "-o", "json"])
+        result = runner.invoke(main, ["--from", "es", str(audio), "--output-format", "json"])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
@@ -111,7 +111,7 @@ def test_transcribe_with_timestamps_json(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["--from", "en", str(audio), "--timestamps", "-o", "json"])
+        result = runner.invoke(main, ["--from", "en", str(audio), "--timestamps", "--output-format", "json"])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
