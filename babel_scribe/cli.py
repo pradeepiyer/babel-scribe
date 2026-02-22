@@ -6,8 +6,8 @@ import click
 from rich.console import Console
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
-from babel_scribe.config import load_config
 from babel_scribe.pipeline import scribe
+from babel_scribe.providers import normalize_language_code
 from babel_scribe.transcriber import Transcriber, create_transcriber
 from babel_scribe.translator import Translator, create_translator
 from babel_scribe.types import ScribeError, ScribeResult
@@ -67,7 +67,7 @@ def _output_path_for(audio_path: Path, output_folder: Path | None) -> Path:
 async def _process_local_files(
     paths: list[Path],
     transcriber: Transcriber,
-    translator: Translator,
+    translator: Translator | None,
     source_language: str | None,
     target_language: str,
     timestamps: bool,
@@ -139,48 +139,39 @@ def main() -> None:
 
 @main.command()
 @click.argument("sources", nargs=-1, required=True)
-@click.option("--from", "from_lang", default=None, help="Source language code")
-@click.option("--to", "to_lang", default=None, help="Target language code")
-@click.option("--transcription-model", default=None, help="Transcription model")
-@click.option("--translation-model", default=None, help="Translation model")
+@click.option("--from", "from_lang", required=True, help="Source language code")
+@click.option("--to", "to_lang", default="en", help="Target language code")
 @click.option("-o", "--output-format", type=click.Choice(["text", "json"]), default="text")
 @click.option("--output-folder", default=None, help="Output folder")
-@click.option("--concurrency", type=int, default=None, help="Max parallel tasks")
+@click.option("--concurrency", type=int, default=5, help="Max parallel tasks")
+@click.option("--job-timeout", type=int, default=1800, help="Sarvam batch job timeout in seconds")
 @click.option("--timestamps", is_flag=True, help="Include segment timestamps")
 def transcribe(
     sources: tuple[str, ...],
-    from_lang: str | None,
-    to_lang: str | None,
-    transcription_model: str | None,
-    translation_model: str | None,
+    from_lang: str,
+    to_lang: str,
     output_format: str,
     output_folder: str | None,
-    concurrency: int | None,
+    concurrency: int,
+    job_timeout: int,
     timestamps: bool,
 ) -> None:
     """Transcribe and translate audio files."""
-    config = load_config()
-
-    target_language = to_lang or config.target_language
-    effective_concurrency = concurrency or config.concurrency
-    t_model = transcription_model or config.transcription_model
-    l_model = translation_model or config.translation_model
-
-    transcriber = create_transcriber(t_model, target_language, config.job_timeout)
-    translator = create_translator(l_model)
-
     try:
+        transcriber = create_transcriber(from_lang, to_lang, job_timeout)
+        translator = create_translator() if normalize_language_code(to_lang) != "en" else None
+
         asyncio.run(
             _run_transcribe(
                 sources,
                 transcriber,
                 translator,
                 from_lang,
-                target_language,
+                to_lang,
                 timestamps,
                 output_format,
                 output_folder,
-                effective_concurrency,
+                concurrency,
             )
         )
     except ScribeError as e:
@@ -191,7 +182,7 @@ def transcribe(
 async def _run_transcribe(
     sources: tuple[str, ...],
     transcriber: Transcriber,
-    translator: Translator,
+    translator: Translator | None,
     source_language: str | None,
     target_language: str,
     timestamps: bool,

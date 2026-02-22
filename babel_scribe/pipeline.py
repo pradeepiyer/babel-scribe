@@ -2,13 +2,13 @@ from pathlib import Path
 
 from babel_scribe.transcriber import Transcriber
 from babel_scribe.translator import Translator
-from babel_scribe.types import ScribeResult, TranslationResult
+from babel_scribe.types import ScribeError, ScribeResult, TranslationResult
 
 
 async def scribe(
     audio_path: Path,
     transcriber: Transcriber,
-    translator: Translator,
+    translator: Translator | None,
     source_language: str | None = None,
     target_language: str = "en",
     timestamps: bool = False,
@@ -18,6 +18,9 @@ async def scribe(
     detected_language = transcription.source_language or source_language
     if detected_language and detected_language.lower() == target_language.lower():
         return ScribeResult(transcription=transcription)
+
+    if translator is None:
+        raise ScribeError("No translator configured but translation is required")
 
     translated_text = await translator.translate(
         transcription.text,

@@ -1,9 +1,8 @@
-import os
 from typing import Protocol
 
 import openai
 
-from babel_scribe.providers import TRANSIENT_ERRORS, api_retry, parse_model
+from babel_scribe.providers import OPENAI_BASE_URL, TRANSIENT_ERRORS, api_retry, get_api_key
 from babel_scribe.types import ScribeError
 
 
@@ -40,7 +39,8 @@ class ChatTranslator:
         return response.choices[0].message.content or ""
 
 
-def create_translator(model: str) -> Translator:
-    base_url, api_key_env, model_name = parse_model(model)
-    api_key = os.environ.get(api_key_env, "")
-    return ChatTranslator(model=model_name, base_url=base_url, api_key=api_key)
+TRANSLATION_MODEL = "gpt-5-mini"
+
+
+def create_translator() -> Translator:
+    return ChatTranslator(model=TRANSLATION_MODEL, base_url=OPENAI_BASE_URL, api_key=get_api_key("OPENAI_API_KEY"))

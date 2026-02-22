@@ -3,16 +3,17 @@ import os
 import pytest
 
 from babel_scribe.translator import ChatTranslator, create_translator
+from babel_scribe.types import ScribeError
 
 pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
 def translator() -> ChatTranslator:
-    api_key = os.environ.get("GROQ_API_KEY", "")
+    api_key = os.environ.get("OPENAI_API_KEY", "")
     return ChatTranslator(
-        model="llama-3.3-70b-versatile",
-        base_url="https://api.groq.com/openai/v1",
+        model="gpt-5-mini",
+        base_url="https://api.openai.com/v1",
         api_key=api_key,
     )
 
@@ -32,12 +33,13 @@ async def test_translate_preserves_meaning(translator: ChatTranslator) -> None:
     assert "hello" in result.lower() or "good" in result.lower()
 
 
-def test_create_translator_groq(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GROQ_API_KEY", "test-key")
-    t = create_translator("groq/llama-3.3-70b-versatile")
+def test_create_translator(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    t = create_translator()
     assert isinstance(t, ChatTranslator)
 
 
-def test_create_translator_unknown_provider() -> None:
-    with pytest.raises(ValueError, match="Unknown provider"):
-        create_translator("unknown/model")
+def test_create_translator_missing_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    with pytest.raises(ScribeError, match="Missing API key"):
+        create_translator()

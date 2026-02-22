@@ -8,8 +8,14 @@ from babel_scribe.types import Segment, TranscriptionResult
 
 @pytest.fixture
 def require_api_key() -> None:
-    if not os.environ.get("GROQ_API_KEY"):
-        pytest.skip("GROQ_API_KEY not set")
+    if not os.environ.get("OPENAI_API_KEY"):
+        pytest.skip("OPENAI_API_KEY not set")
+
+
+@pytest.fixture
+def require_sarvam_key() -> None:
+    if not os.environ.get("SARVAM_API_KEY"):
+        pytest.skip("SARVAM_API_KEY not set")
 
 
 class FakeTranscriber:

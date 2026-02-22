@@ -2,22 +2,36 @@ import json
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from click.testing import CliRunner
 
 from babel_scribe.cli import main
 from babel_scribe.types import ScribeResult, Segment, TranscriptionResult, TranslationResult
 
 
+@pytest.fixture(autouse=True)
+def _set_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:  # pyright: ignore[reportUnusedFunction]
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("SARVAM_API_KEY", "test-key")
+
+
 def test_transcribe_requires_source() -> None:
     runner = CliRunner()
-    result = runner.invoke(main, ["transcribe"])
+    result = runner.invoke(main, ["transcribe", "--from", "es"])
     assert result.exit_code != 0
     assert "Missing argument" in result.output
 
 
+def test_transcribe_requires_from_lang() -> None:
+    runner = CliRunner()
+    result = runner.invoke(main, ["transcribe", "file.mp3"])
+    assert result.exit_code != 0
+    assert "Missing option" in result.output or "required" in result.output.lower()
+
+
 def test_transcribe_nonexistent_file() -> None:
     runner = CliRunner()
-    result = runner.invoke(main, ["transcribe", "/nonexistent/file.mp3"])
+    result = runner.invoke(main, ["transcribe", "--from", "es", "/nonexistent/file.mp3"])
     assert result.exit_code == 1
     assert "File not found" in result.output
 
@@ -33,7 +47,7 @@ def test_transcribe_local_file_text_output(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", str(audio), "--to", "en"])
+        result = runner.invoke(main, ["transcribe", "--from", "es", "--to", "en", str(audio)])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
@@ -52,7 +66,7 @@ def test_transcribe_local_file_json_output(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", str(audio), "-o", "json"])
+        result = runner.invoke(main, ["transcribe", "--from", "es", str(audio), "-o", "json"])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
@@ -75,7 +89,7 @@ def test_transcribe_with_timestamps_text(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", str(audio), "--timestamps", "--to", "en"])
+        result = runner.invoke(main, ["transcribe", "--from", "en", "--to", "en", str(audio), "--timestamps"])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
@@ -97,7 +111,7 @@ def test_transcribe_with_timestamps_json(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", str(audio), "--timestamps", "-o", "json"])
+        result = runner.invoke(main, ["transcribe", "--from", "en", str(audio), "--timestamps", "-o", "json"])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
@@ -118,7 +132,9 @@ def test_transcribe_output_folder(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", str(audio), "--output-folder", str(out_dir), "--to", "en"])
+        result = runner.invoke(
+            main, ["transcribe", "--from", "en", "--to", "en", str(audio), "--output-folder", str(out_dir)]
+        )
 
     assert result.exit_code == 0
     out_file = out_dir / "test.txt"
@@ -139,7 +155,7 @@ def test_transcribe_multiple_local_files(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", *files, "--to", "en"])
+        result = runner.invoke(main, ["transcribe", "--from", "en", "--to", "en", *files])
 
     assert result.exit_code == 0
     for i in range(3):
@@ -156,7 +172,7 @@ def test_transcribe_no_translation_when_same_language(tmp_path: Path) -> None:
 
     with patch("babel_scribe.cli.scribe", new_callable=AsyncMock, return_value=scribe_result):
         runner = CliRunner()
-        result = runner.invoke(main, ["transcribe", str(audio), "--to", "en"])
+        result = runner.invoke(main, ["transcribe", "--from", "en", "--to", "en", str(audio)])
 
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"

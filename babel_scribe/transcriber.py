@@ -1,13 +1,19 @@
 import asyncio
 import json
-import os
 import tempfile
 from pathlib import Path
 from typing import Any, Protocol
 
 import openai
 
-from babel_scribe.providers import TRANSIENT_ERRORS, api_retry, parse_model
+from babel_scribe.providers import (
+    OPENAI_BASE_URL,
+    TRANSIENT_ERRORS,
+    api_retry,
+    get_api_key,
+    is_indian_language,
+    normalize_language_code,
+)
 from babel_scribe.types import ScribeError, Segment, TranscriptionResult
 
 
@@ -87,7 +93,7 @@ class SarvamTranscriber:
         timestamps: bool = False,
     ) -> TranscriptionResult:
         mode = "translate" if self.target_language == "en" else "transcribe"
-        lang_code = f"{language}-IN" if language else "unknown"
+        lang_code = f"{normalize_language_code(language)}-IN" if language else "unknown"
 
         try:
             return await asyncio.to_thread(self._run_batch_job, audio_path, mode, lang_code, timestamps)
@@ -149,19 +155,24 @@ class SarvamTranscriber:
         return TranscriptionResult(text=text, source_language=source_language, segments=segments)
 
 
-def create_transcriber(model: str, target_language: str = "en", job_timeout: int = 1800) -> Transcriber:
-    base_url, api_key_env, model_name = parse_model(model)
-    api_key = os.environ.get(api_key_env, "")
-    if not base_url:
+WHISPER_MODEL = "whisper-1"
+SARVAM_MODEL = "saaras:v3"
+
+
+def create_transcriber(source_language: str, target_language: str = "en", job_timeout: int = 1800) -> Transcriber:
+    """Select and configure a transcriber based on source language."""
+    normalized_target = normalize_language_code(target_language)
+
+    if is_indian_language(source_language):
         return SarvamTranscriber(
-            model=model_name,
-            api_key=api_key,
-            target_language=target_language,
+            model=SARVAM_MODEL,
+            api_key=get_api_key("SARVAM_API_KEY"),
+            target_language=normalized_target,
             job_timeout=job_timeout,
         )
     return WhisperTranscriber(
-        model=model_name,
-        base_url=base_url,
-        api_key=api_key,
-        target_language=target_language,
+        model=WHISPER_MODEL,
+        base_url=OPENAI_BASE_URL,
+        api_key=get_api_key("OPENAI_API_KEY"),
+        target_language=normalized_target,
     )

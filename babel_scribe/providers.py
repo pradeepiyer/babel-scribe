@@ -1,5 +1,9 @@
+import os
+
 import openai
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+
+from babel_scribe.types import ScribeError
 
 TRANSIENT_ERRORS = (openai.RateLimitError, openai.APITimeoutError, openai.APIConnectionError)
 
@@ -10,19 +14,50 @@ api_retry = retry(
     reraise=True,
 )
 
-# (base_url, api_key_env)
-PROVIDERS: dict[str, tuple[str, str]] = {
-    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY"),
-    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY"),
-    "sarvam": ("", "SARVAM_API_KEY"),
-}
+OPENAI_BASE_URL = "https://api.openai.com/v1"
+
+# ISO 639-1 codes for languages supported by Sarvam AI
+INDIAN_LANGUAGES: frozenset[str] = frozenset(
+    {
+        "as",  # Assamese
+        "bn",  # Bengali
+        "brx",  # Bodo
+        "doi",  # Dogri
+        "gu",  # Gujarati
+        "hi",  # Hindi
+        "kn",  # Kannada
+        "kok",  # Konkani
+        "ks",  # Kashmiri
+        "mai",  # Maithili
+        "ml",  # Malayalam
+        "mni",  # Manipuri
+        "mr",  # Marathi
+        "ne",  # Nepali
+        "or",  # Odia
+        "pa",  # Punjabi
+        "sa",  # Sanskrit
+        "sat",  # Santali
+        "sd",  # Sindhi
+        "ta",  # Tamil
+        "te",  # Telugu
+        "ur",  # Urdu
+    }
+)
 
 
-def parse_model(model: str) -> tuple[str, str, str]:
-    """Split 'groq/whisper-large-v3-turbo' into (base_url, api_key_env, model_name)."""
-    prefix, sep, model_name = model.partition("/")
-    if not sep or prefix not in PROVIDERS:
-        known = ", ".join(PROVIDERS)
-        raise ValueError(f"Unknown provider in model '{model}'. Known providers: {known}")
-    base_url, api_key_env = PROVIDERS[prefix]
-    return base_url, api_key_env, model_name
+def normalize_language_code(code: str) -> str:
+    """Strip region/script subtags for routing purposes. e.g. 'hi-IN' -> 'hi', 'pt-BR' -> 'pt'."""
+    return code.split("-")[0].lower()
+
+
+def is_indian_language(code: str) -> bool:
+    """Check if a language code refers to an Indian language supported by Sarvam."""
+    return normalize_language_code(code) in INDIAN_LANGUAGES
+
+
+def get_api_key(env_var: str) -> str:
+    """Read an API key from the environment, raising ScribeError if missing."""
+    key = os.environ.get(env_var, "")
+    if not key:
+        raise ScribeError(f"Missing API key: set the {env_var} environment variable")
+    return key
