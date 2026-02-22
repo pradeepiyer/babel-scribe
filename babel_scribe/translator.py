@@ -1,13 +1,12 @@
 import os
-from typing import Protocol, runtime_checkable
+from typing import Protocol
 
 import openai
 
-from babel_scribe.errors import TranslationError
-from babel_scribe.providers import api_retry, handle_api_errors, parse_model
+from babel_scribe.providers import TRANSIENT_ERRORS, api_retry, parse_model
+from babel_scribe.types import ScribeError
 
 
-@runtime_checkable
 class Translator(Protocol):
     async def translate(
         self, text: str, source_language: str, target_language: str
@@ -35,15 +34,19 @@ class ChatTranslator:
             {"role": "user", "content": text},
         ]
 
-        with handle_api_errors(TranslationError):
+        try:
             response = await self._client.chat.completions.create(
                 model=self.model, messages=messages  # type: ignore[arg-type]
             )
+        except TRANSIENT_ERRORS:
+            raise
+        except openai.OpenAIError as e:
+            raise ScribeError(str(e)) from e
 
         return response.choices[0].message.content or ""
 
 
 def create_translator(model: str) -> Translator:
-    provider, model_name = parse_model(model)
-    api_key = os.environ.get(provider.api_key_env, "")
-    return ChatTranslator(model=model_name, base_url=provider.base_url, api_key=api_key)
+    base_url, api_key_env, model_name = parse_model(model)
+    api_key = os.environ.get(api_key_env, "")
+    return ChatTranslator(model=model_name, base_url=base_url, api_key=api_key)

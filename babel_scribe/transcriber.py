@@ -3,16 +3,14 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol
 
 import openai
 
-from babel_scribe.errors import TranscriptionError
-from babel_scribe.providers import PROVIDERS, api_retry, handle_api_errors, parse_model
-from babel_scribe.types import Segment, TranscriptionResult
+from babel_scribe.providers import TRANSIENT_ERRORS, api_retry, parse_model
+from babel_scribe.types import ScribeError, Segment, TranscriptionResult
 
 
-@runtime_checkable
 class Transcriber(Protocol):
     async def transcribe(
         self,
@@ -43,8 +41,12 @@ class WhisperTranscriber:
         if timestamps:
             kwargs["response_format"] = "verbose_json"
 
-        with handle_api_errors(TranscriptionError):
+        try:
             response = await self._client.audio.transcriptions.create(**kwargs)
+        except TRANSIENT_ERRORS:
+            raise
+        except openai.OpenAIError as e:
+            raise ScribeError(str(e)) from e
 
         if timestamps:
             # verbose_json returns a Transcription object with extra fields
@@ -96,10 +98,10 @@ class SarvamTranscriber:
             return await asyncio.to_thread(
                 self._run_batch_job, audio_path, mode, lang_code, timestamps
             )
-        except TranscriptionError:
+        except ScribeError:
             raise
         except Exception as e:
-            raise TranscriptionError(str(e)) from e
+            raise ScribeError(str(e)) from e
 
     def _run_batch_job(
         self,
@@ -126,7 +128,7 @@ class SarvamTranscriber:
             job.download_outputs(tmp_dir)
             json_files = list(Path(tmp_dir).glob("*.json"))
             if not json_files:
-                raise TranscriptionError("No output from Sarvam batch job")
+                raise ScribeError("No output from Sarvam batch job")
             data = json.loads(json_files[0].read_text())
 
         return self._parse_response(data, mode)
@@ -157,11 +159,11 @@ class SarvamTranscriber:
 def create_transcriber(
     model: str, target_language: str = "en", job_timeout: int = 1800
 ) -> Transcriber:
-    provider, model_name = parse_model(model)
-    api_key = os.environ.get(provider.api_key_env, "")
-    if provider is PROVIDERS["sarvam"]:
+    base_url, api_key_env, model_name = parse_model(model)
+    api_key = os.environ.get(api_key_env, "")
+    if not base_url:
         return SarvamTranscriber(
             model=model_name, api_key=api_key, target_language=target_language,
             job_timeout=job_timeout,
         )
-    return WhisperTranscriber(model=model_name, base_url=provider.base_url, api_key=api_key)
+    return WhisperTranscriber(model=model_name, base_url=base_url, api_key=api_key)

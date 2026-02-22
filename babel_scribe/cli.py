@@ -7,11 +7,10 @@ from rich.console import Console
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
 from babel_scribe.config import load_config
-from babel_scribe.errors import ScribeError
 from babel_scribe.pipeline import scribe
 from babel_scribe.transcriber import Transcriber, create_transcriber
 from babel_scribe.translator import Translator, create_translator
-from babel_scribe.types import ScribeResult
+from babel_scribe.types import ScribeError, ScribeResult
 
 console = Console()
 

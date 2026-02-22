@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 
 
+class ScribeError(Exception):
+    pass
+
+
 @dataclass(frozen=True)
 class Segment:
     text: str
