@@ -5,6 +5,20 @@ from babel_scribe.translator import Translator
 from babel_scribe.types import ScribeError, ScribeResult, TranslationResult
 
 
+async def translate(
+    text: str,
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+) -> TranslationResult:
+    translated_text = await translator.translate(text, source_language, target_language)
+    return TranslationResult(
+        text=translated_text,
+        source_language=source_language,
+        target_language=target_language,
+    )
+
+
 async def scribe(
     audio_path: Path,
     transcriber: Transcriber,

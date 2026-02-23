@@ -1,21 +1,23 @@
 import asyncio
 import json
+import mimetypes
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import click
 from rich.console import Console
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn
 
-from babel_scribe.pipeline import scribe
+from babel_scribe.pipeline import scribe, translate
 from babel_scribe.providers import normalize_language_code
 from babel_scribe.transcriber import Transcriber, create_transcriber
 from babel_scribe.translator import Translator, create_translator
-from babel_scribe.types import ScribeError, ScribeResult
+from babel_scribe.types import ScribeError, ScribeResult, TranslationResult
 
 console = Console()
 
 
-def _format_text_output(result: ScribeResult, timestamps: bool) -> str:
+def _format_scribe_text(result: ScribeResult, timestamps: bool) -> str:
     text = result.translation.text if result.translation else result.transcription.text
 
     if timestamps and result.transcription.segments:
@@ -32,7 +34,7 @@ def _format_text_output(result: ScribeResult, timestamps: bool) -> str:
     return text
 
 
-def _format_json_output(result: ScribeResult) -> str:
+def _format_scribe_json(result: ScribeResult) -> str:
     data: dict[str, object] = {
         "transcription": {
             "text": result.transcription.text,
@@ -59,34 +61,71 @@ def _format_json_output(result: ScribeResult) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False)
 
 
-def _output_path_for(audio_path: Path, output_folder: Path | None) -> Path:
-    folder = output_folder or audio_path.parent
-    return folder / f"{audio_path.stem}.txt"
+def _format_translation_text(result: TranslationResult) -> str:
+    return result.text
 
 
-async def _process_local_files(
+def _format_translation_json(result: TranslationResult) -> str:
+    data = {
+        "translation": {
+            "text": result.text,
+            "source_language": result.source_language,
+            "target_language": result.target_language,
+        },
+    }
+    return json.dumps(data, indent=2, ensure_ascii=False)
+
+
+def _audio_output_path(source: Path, output_folder: Path | None) -> Path:
+    folder = output_folder or source.parent
+    return folder / f"{source.stem}.txt"
+
+
+def _text_output_path(source: Path, output_folder: Path | None) -> Path:
+    folder = output_folder or source.parent
+    return folder / f"{source.stem}.translated.txt"
+
+
+def _detect_mode(paths: list[Path]) -> str:
+    """Detect whether input files are text or audio based on MIME type.
+
+    Returns 'text' or 'audio'. Raises ScribeError for unrecognized or mixed types.
+    """
+    modes: set[str] = set()
+    for path in paths:
+        mime_type, _ = mimetypes.guess_type(str(path))
+        if mime_type is None:
+            raise ScribeError(f"Cannot determine file type for {path.name} — use a recognized file extension")
+        major = mime_type.split("/")[0]
+        if major == "text":
+            modes.add("text")
+        elif major in ("audio", "video"):
+            modes.add("audio")
+        else:
+            raise ScribeError(f"Unsupported file type '{mime_type}' for {path.name}")
+    if len(modes) > 1:
+        raise ScribeError("Cannot mix text and audio files in a single invocation")
+    return modes.pop()
+
+
+async def _process_files(
     paths: list[Path],
-    transcriber: Transcriber,
-    translator: Translator | None,
-    source_language: str | None,
-    target_language: str,
-    timestamps: bool,
-    output_format: str,
-    output_folder: Path | None,
+    process_one: Callable[[Path], Awaitable[str]],
+    output_path_for: Callable[[Path], Path],
     concurrency: int,
+    verb: str,
 ) -> None:
-    remaining = [p for p in paths if not _output_path_for(p, output_folder).exists()]
+    remaining = [p for p in paths if not output_path_for(p).exists()]
     if len(remaining) < len(paths):
-        console.print(f"Skipping {len(paths) - len(remaining)} already transcribed file(s)")
+        console.print(f"Skipping {len(paths) - len(remaining)} already processed file(s)")
     if not remaining:
         return
     paths = remaining
 
     if len(paths) == 1:
-        console.print(f"Transcribing [bold]{paths[0].name}[/bold]...")
-        result = await scribe(paths[0], transcriber, translator, source_language, target_language, timestamps)
-        output = _format_json_output(result) if output_format == "json" else _format_text_output(result, timestamps)
-        out_path = _output_path_for(paths[0], output_folder)
+        console.print(f"{verb} [bold]{paths[0].name}[/bold]...")
+        output = await process_one(paths[0])
+        out_path = output_path_for(paths[0])
         out_path.write_text(output, encoding="utf-8")
         console.print(f"Output written to [bold]{out_path}[/bold]")
         return
@@ -104,26 +143,23 @@ async def _process_local_files(
 
         failed: list[tuple[Path, Exception]] = []
 
-        async def process_one(path: Path) -> None:
+        async def _run_one(path: Path) -> None:
             async with semaphore:
                 try:
-                    result = await scribe(path, transcriber, translator, source_language, target_language, timestamps)
+                    output = await process_one(path)
                 except Exception as e:
                     failed.append((path, e))
                     progress.console.print(f"  [red]FAILED[/red] [bold]{path.name}[/bold]: {e}")
                     progress.advance(task)
                     return
-                output = (
-                    _format_json_output(result) if output_format == "json" else _format_text_output(result, timestamps)
-                )
-                out_path = _output_path_for(path, output_folder)
+                out_path = output_path_for(path)
                 out_path.write_text(output, encoding="utf-8")
                 progress.console.print(f"  [bold]{path.name}[/bold] → {out_path}")
                 progress.advance(task)
 
         async with asyncio.TaskGroup() as tg:
             for p in paths:
-                tg.create_task(process_one(p))
+                tg.create_task(_run_one(p))
 
     if failed:
         console.print(f"\n[red]{len(failed)} file(s) failed:[/red]")
@@ -132,11 +168,63 @@ async def _process_local_files(
         raise SystemExit(1)
 
 
+async def _run_transcribe(
+    paths: list[Path],
+    transcriber: Transcriber,
+    translator: Translator | None,
+    source_language: str | None,
+    target_language: str,
+    timestamps: bool,
+    output_format: str,
+    output_folder: Path | None,
+    concurrency: int,
+) -> None:
+    async def process_one(path: Path) -> str:
+        result = await scribe(path, transcriber, translator, source_language, target_language, timestamps)
+        if output_format == "json":
+            return _format_scribe_json(result)
+        return _format_scribe_text(result, timestamps)
+
+    await _process_files(
+        paths,
+        process_one,
+        lambda p: _audio_output_path(p, output_folder),
+        concurrency,
+        verb="Transcribing",
+    )
+
+
+async def _run_translate(
+    paths: list[Path],
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+    output_format: str,
+    output_folder: Path | None,
+    concurrency: int,
+) -> None:
+    async def process_one(path: Path) -> str:
+        text = path.read_text(encoding="utf-8")
+        result = await translate(text, translator, source_language, target_language)
+        if output_format == "json":
+            return _format_translation_json(result)
+        return _format_translation_text(result)
+
+    await _process_files(
+        paths,
+        process_one,
+        lambda p: _text_output_path(p, output_folder),
+        concurrency,
+        verb="Translating",
+    )
+
+
 @click.command(epilog="""\b
 Examples:
   babel-scribe recording.mp3 --from hi
   babel-scribe recording.mp3 --from es --to fr
   babel-scribe recording.mp3 --from hi --timestamps
+  babel-scribe essay.txt --from hi --to en
   babel-scribe '*.mp3' --from ta --output-format json
 """)
 @click.argument("sources", nargs=-1, required=True)
@@ -160,60 +248,38 @@ def main(
     job_timeout: int,
     timestamps: bool,
 ) -> None:
-    """Transcribe and translate audio files."""
+    """Transcribe and translate audio files, or translate text files."""
     try:
-        transcriber = create_transcriber(from_lang, to_lang, job_timeout)
-        translator = create_translator() if normalize_language_code(to_lang) != "en" else None
+        paths: list[Path] = []
+        for source in sources:
+            path = Path(source)
+            if not path.exists():
+                raise ScribeError(f"File not found: {source}")
+            paths.append(path)
 
-        asyncio.run(
-            _run_transcribe(
-                sources,
-                transcriber,
-                translator,
-                from_lang,
-                to_lang,
-                timestamps,
-                output_format,
-                output_folder,
-                concurrency,
+        local_output_folder: Path | None = None
+        if output_folder:
+            local_output_folder = Path(output_folder)
+            local_output_folder.mkdir(parents=True, exist_ok=True)
+
+        mode = _detect_mode(paths)
+
+        if mode == "text":
+            if normalize_language_code(from_lang) == normalize_language_code(to_lang):
+                raise ScribeError("Source and target languages are the same — nothing to translate")
+            translator = create_translator(from_lang, to_lang)
+            asyncio.run(
+                _run_translate(paths, translator, from_lang, to_lang, output_format, local_output_folder, concurrency)
             )
-        )
+        else:
+            transcriber = create_transcriber(from_lang, to_lang, job_timeout)
+            translator = create_translator(from_lang, to_lang) if normalize_language_code(to_lang) != "en" else None
+            asyncio.run(
+                _run_transcribe(
+                    paths, transcriber, translator, from_lang, to_lang, timestamps,
+                    output_format, local_output_folder, concurrency,
+                )
+            )
     except ScribeError as e:
         console.print(f"[red]Error:[/red] {e}")
         raise SystemExit(1) from None
-
-
-async def _run_transcribe(
-    sources: tuple[str, ...],
-    transcriber: Transcriber,
-    translator: Translator | None,
-    source_language: str | None,
-    target_language: str,
-    timestamps: bool,
-    output_format: str,
-    output_folder: str | None,
-    concurrency: int,
-) -> None:
-    paths: list[Path] = []
-    for source in sources:
-        path = Path(source)
-        if not path.exists():
-            raise ScribeError(f"File not found: {source}")
-        paths.append(path)
-
-    local_output_folder: Path | None = None
-    if output_folder:
-        local_output_folder = Path(output_folder)
-        local_output_folder.mkdir(parents=True, exist_ok=True)
-
-    await _process_local_files(
-        paths,
-        transcriber,
-        translator,
-        source_language,
-        target_language,
-        timestamps,
-        output_format,
-        local_output_folder,
-        concurrency,
-    )

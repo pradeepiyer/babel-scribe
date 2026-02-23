@@ -177,3 +177,120 @@ def test_transcribe_no_translation_when_same_language(tmp_path: Path) -> None:
     assert result.exit_code == 0
     out_file = tmp_path / "test.txt"
     assert out_file.read_text() == "hello world"
+
+
+# --- Text-mode CLI tests ---
+
+
+def test_translate_text_file_text_output(tmp_path: Path) -> None:
+    text_file = tmp_path / "essay.txt"
+    text_file.write_text("नमस्ते दुनिया", encoding="utf-8")
+
+    translation = TranslationResult(text="hello world", source_language="hi", target_language="en")
+
+    with patch("babel_scribe.cli.translate", new_callable=AsyncMock, return_value=translation):
+        runner = CliRunner()
+        result = runner.invoke(main, ["--from", "hi", "--to", "en", str(text_file)])
+
+    assert result.exit_code == 0
+    out_file = tmp_path / "essay.translated.txt"
+    assert out_file.exists()
+    assert out_file.read_text() == "hello world"
+
+
+def test_translate_text_file_json_output(tmp_path: Path) -> None:
+    text_file = tmp_path / "essay.txt"
+    text_file.write_text("नमस्ते दुनिया", encoding="utf-8")
+
+    translation = TranslationResult(text="hello world", source_language="hi", target_language="en")
+
+    with patch("babel_scribe.cli.translate", new_callable=AsyncMock, return_value=translation):
+        runner = CliRunner()
+        result = runner.invoke(main, ["--from", "hi", "--to", "en", str(text_file), "--output-format", "json"])
+
+    assert result.exit_code == 0
+    out_file = tmp_path / "essay.translated.txt"
+    data = json.loads(out_file.read_text())
+    assert data["translation"]["text"] == "hello world"
+    assert data["translation"]["source_language"] == "hi"
+    assert data["translation"]["target_language"] == "en"
+
+
+def test_translate_multiple_text_files(tmp_path: Path) -> None:
+    files = []
+    for i in range(3):
+        f = tmp_path / f"doc{i}.txt"
+        f.write_text(f"text {i}", encoding="utf-8")
+        files.append(str(f))
+
+    translation = TranslationResult(text="translated", source_language="hi", target_language="en")
+
+    with patch("babel_scribe.cli.translate", new_callable=AsyncMock, return_value=translation):
+        runner = CliRunner()
+        result = runner.invoke(main, ["--from", "hi", "--to", "en", *files])
+
+    assert result.exit_code == 0
+    for i in range(3):
+        assert (tmp_path / f"doc{i}.translated.txt").exists()
+
+
+def test_translate_text_file_output_folder(tmp_path: Path) -> None:
+    text_file = tmp_path / "essay.txt"
+    text_file.write_text("texto", encoding="utf-8")
+    out_dir = tmp_path / "output"
+
+    translation = TranslationResult(text="text", source_language="es", target_language="en")
+
+    with patch("babel_scribe.cli.translate", new_callable=AsyncMock, return_value=translation):
+        runner = CliRunner()
+        result = runner.invoke(
+            main, ["--from", "es", "--to", "en", str(text_file), "--output-folder", str(out_dir)]
+        )
+
+    assert result.exit_code == 0
+    out_file = out_dir / "essay.translated.txt"
+    assert out_file.exists()
+    assert out_file.read_text() == "text"
+
+
+def test_translate_text_same_language_error(tmp_path: Path) -> None:
+    text_file = tmp_path / "essay.txt"
+    text_file.write_text("hello", encoding="utf-8")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["--from", "en", "--to", "en", str(text_file)])
+
+    assert result.exit_code == 1
+    assert "same" in result.output.lower()
+
+
+def test_mixed_text_and_audio_error(tmp_path: Path) -> None:
+    text_file = tmp_path / "essay.txt"
+    text_file.write_text("text", encoding="utf-8")
+    audio_file = tmp_path / "recording.mp3"
+    audio_file.write_bytes(b"fake audio")
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["--from", "hi", "--to", "en", str(text_file), str(audio_file)])
+
+    assert result.exit_code == 1
+    assert "mix" in result.output.lower()
+
+
+def test_translate_text_does_not_overwrite_source(tmp_path: Path) -> None:
+    text_file = tmp_path / "essay.txt"
+    original_content = "original hindi text"
+    text_file.write_text(original_content, encoding="utf-8")
+
+    translation = TranslationResult(text="translated english", source_language="hi", target_language="en")
+
+    with patch("babel_scribe.cli.translate", new_callable=AsyncMock, return_value=translation):
+        runner = CliRunner()
+        result = runner.invoke(main, ["--from", "hi", "--to", "en", str(text_file)])
+
+    assert result.exit_code == 0
+    # Source file should be untouched
+    assert text_file.read_text() == original_content
+    # Output goes to .translated.txt
+    out_file = tmp_path / "essay.translated.txt"
+    assert out_file.read_text() == "translated english"

@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from babel_scribe.pipeline import scribe
+from babel_scribe.pipeline import scribe, translate
 from babel_scribe.types import ScribeError, Segment
 
 from .conftest import FakeTranscriber, FakeTranslator
@@ -91,3 +91,27 @@ async def test_scribe_raises_when_translator_missing(tmp_path: Path) -> None:
 
     with pytest.raises(ScribeError, match="No translator configured"):
         await scribe(audio, transcriber, None, target_language="en")
+
+
+async def test_translate_returns_translation_result() -> None:
+    translator = FakeTranslator(translated_text="hello world")
+    result = await translate("hola mundo", translator, "es", "en")
+
+    assert result.text == "hello world"
+    assert result.source_language == "es"
+    assert result.target_language == "en"
+
+
+async def test_translate_passes_languages_to_translator() -> None:
+    translator = FakeTranslator(translated_text="bonjour")
+    await translate("hello", translator, "en", "fr")
+
+    assert translator.calls == [("hello", "en", "fr")]
+
+
+async def test_translate_preserves_source_language() -> None:
+    translator = FakeTranslator(translated_text="translated")
+    result = await translate("text", translator, "hi", "en")
+
+    assert result.source_language == "hi"
+    assert result.target_language == "en"

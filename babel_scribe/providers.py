@@ -55,6 +55,19 @@ def is_indian_language(code: str) -> bool:
     return normalize_language_code(code) in INDIAN_LANGUAGES
 
 
+def to_sarvam_language_code(code: str) -> str:
+    """Convert an ISO 639 code to the Sarvam AI language code format (e.g. 'hi' → 'hi-IN').
+
+    Odia needs special handling: ISO 639-1 uses 'or' but Sarvam uses 'od'.
+    """
+    base = normalize_language_code(code)
+    if base == "en":
+        return "en-IN"
+    if base == "or":
+        return "od-IN"
+    return f"{base}-IN"
+
+
 def get_api_key(env_var: str) -> str:
     """Read an API key from the environment, raising ScribeError if missing."""
     key = os.environ.get(env_var, "")
