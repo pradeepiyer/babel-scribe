@@ -1,6 +1,6 @@
 # babel-scribe
 
-Audio transcription and translation CLI. Transcribes audio files and optionally translates them to a target language, automatically selecting the right provider based on the source language.
+Audio transcription and text translation CLI. Transcribes audio files and translates text files, automatically selecting the right provider based on the source language.
 
 ## Installation
 
@@ -12,8 +12,8 @@ uv pip install -e .
 
 | Variable | Required for |
 |----------|-------------|
-| `SARVAM_API_KEY` | Indian language transcription |
-| `OPENAI_API_KEY` | Non-Indian language transcription, all translation |
+| `SARVAM_API_KEY` | Indian language transcription and translation |
+| `OPENAI_API_KEY` | Non-Indian language transcription and translation |
 
 ## Usage
 
@@ -35,6 +35,12 @@ babel-scribe recording.mp3 --from es --to fr
 babel-scribe recording.mp3 --from hi --timestamps
 ```
 
+### Translate a text file (Hindi → English)
+
+```bash
+babel-scribe essay.txt --from hi --to en
+```
+
 ### Multiple files
 
 ```bash
@@ -51,10 +57,14 @@ For all options and examples, run `babel-scribe --help`.
 
 ## Provider Routing
 
-The source language determines which transcription provider is used:
+### Transcription (audio files)
 
 - **Indian languages** → [Sarvam AI](https://docs.sarvam.ai/api-reference-docs/speech-to-text/saaras) (`saaras:v3`). When the target is English, Sarvam translates in a single step.
 - **All other languages** → [OpenAI Whisper](https://platform.openai.com/docs/guides/speech-to-text#supported-languages) (`whisper-1`). When the target is English, the Whisper translations endpoint is used.
 
-Translation (when target is not English) always uses OpenAI (`gpt-5-mini`).
+### Translation (text files and post-transcription)
+
+- **Indian↔English** → [Sarvam AI](https://docs.sarvam.ai/api-reference-docs/translate) (`sarvam-translate:v1`)
+- **Indian↔non-English** → chained via English (Sarvam + OpenAI)
+- **All other pairs** → OpenAI (`gpt-5-mini`)
 
