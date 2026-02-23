@@ -48,6 +48,38 @@ class ChatTranslator:
         return response.choices[0].message.content or ""
 
 
+_SARVAM_MODEL = "sarvam-translate:v1"
+_SARVAM_MAX_CHARS = 1900  # API limit is 2000; leave headroom
+
+
+def _split_text(text: str, max_chars: int) -> list[str]:
+    """Split text into chunks that fit within max_chars, breaking at paragraph boundaries."""
+    if len(text) <= max_chars:
+        return [text]
+
+    paragraphs = text.split("\n\n")
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    for para in paragraphs:
+        # +2 for the "\n\n" separator between paragraphs
+        sep_len = 2 if current else 0
+        if current_len + sep_len + len(para) <= max_chars:
+            current.append(para)
+            current_len += sep_len + len(para)
+        else:
+            if current:
+                chunks.append("\n\n".join(current))
+            current = [para]
+            current_len = len(para)
+
+    if current:
+        chunks.append("\n\n".join(current))
+
+    return chunks
+
+
 class SarvamTranslator:
     """Translates text using the Sarvam AI text translation API."""
 
@@ -69,12 +101,17 @@ class SarvamTranslator:
         from sarvamai import SarvamAI
 
         client = SarvamAI(api_subscription_key=self.api_key)
-        response = client.text.translate(
-            input=text,
-            source_language_code=source_language_code,  # type: ignore[arg-type]
-            target_language_code=target_language_code,  # type: ignore[arg-type]
-        )
-        return response.translated_text
+        chunks = _split_text(text, max_chars=_SARVAM_MAX_CHARS)
+        translated_chunks = []
+        for chunk in chunks:
+            response = client.text.translate(
+                input=chunk,
+                source_language_code=source_language_code,  # type: ignore[arg-type]
+                target_language_code=target_language_code,  # type: ignore[arg-type]
+                model=_SARVAM_MODEL,  # type: ignore[arg-type]
+            )
+            translated_chunks.append(response.translated_text)
+        return "\n\n".join(translated_chunks)
 
 
 class ChainedTranslator:
